@@ -13,7 +13,7 @@ import (
 )
 
 func TestTenantContextRest_ChangeContext(t *testing.T) {
-	var key = "empresa"
+	var key = " X-Tenant-ID"
 	var schema = "empresaleve"
 
 	db, mock, err := Create(schema)
