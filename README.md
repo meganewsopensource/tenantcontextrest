@@ -38,3 +38,44 @@ Tenant Context  é um middleware projetado  com o objetivo de simplificar a gest
     })
 
 ~~~
+
+### Exemplo GRPc
+
+~~~ go 
+
+    dbs := map[string]*gorm.DB{
+        "tenant1": dbTenant1,
+        "tenant2": dbTenant1,
+        }
+
+    context := newTenantContext(dbs, "X-Tenant-ID")
+    
+    l, err := net.Listen("tcp", ":8080")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println("run on port: 8080")
+
+    server := grpc.NewServer(grpc.UnaryInterceptor(ChangeContextGrpc()))
+
+    pb.RegisterMegaMDFeServer(server, NewMyController())
+    
+    err = server.Serve(l)
+    if err != nil {
+    	log.Fatal(err)
+    }
+
+   /////////
+   
+   func (M MyController) resource(ctx context.Context, c *pb.mymessage) (*emptypb.Empty, error) {
+
+        db := ctx.Value("db").(*gorm.db)
+
+        db.ping()
+        
+        return &emptypb.Empty{}, nil
+}
+
+
+~~~
