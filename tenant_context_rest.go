@@ -58,7 +58,7 @@ func (t tenantContext) ChangeContextGrpc() grpc.UnaryServerInterceptor {
 
 		schemas := md.Get(t.key)
 		if len(schemas) == 0 {
-			return nil, status.Errorf(codes.Unauthenticated, "%s de autorização ausente", t.key)
+			return nil, status.Errorf(codes.NotFound, "%s de autorização ausente", t.key)
 		}
 
 		schema := schemas[0]
