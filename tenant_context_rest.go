@@ -12,8 +12,8 @@ import (
 )
 
 type repo interface {
-	ChangeContextRest()
-	ChangeContextGrpc()
+	ChangeContextRest() gin.HandlerFunc
+	ChangeContextGrpc() grpc.UnaryServerInterceptor
 }
 
 type tenantContext struct {
@@ -21,7 +21,7 @@ type tenantContext struct {
 	key string
 }
 
-func newTenantContext(dbs map[string]*gorm.DB, key string) tenantContext {
+func newTenantContext(dbs map[string]*gorm.DB, key string) repo {
 
 	return tenantContext{
 		dbs: dbs,
