@@ -2,6 +2,7 @@ package tenantcontextrest
 
 import (
 	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -9,9 +10,10 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 	"log"
+	"net/http"
 )
 
-type repo interface {
+type TenantContext interface {
 	ChangeContextRest() gin.HandlerFunc
 	ChangeContextGrpc() grpc.UnaryServerInterceptor
 }
@@ -21,7 +23,7 @@ type tenantContext struct {
 	key string
 }
 
-func newTenantContext(dbs map[string]*gorm.DB, key string) repo {
+func newTenantContext(dbs map[string]*gorm.DB, key string) TenantContext {
 
 	return tenantContext{
 		dbs: dbs,
@@ -39,6 +41,9 @@ func (t tenantContext) ChangeContextRest() gin.HandlerFunc {
 
 		c.Set("db", db)
 
+		if db == nil {
+			c.String(http.StatusNotFound, fmt.Sprintf("%s not found", t.key))
+		}
 	}
 }
 

@@ -64,6 +64,55 @@ func TestChangeContextRest(t *testing.T) {
 
 }
 
+func TestChangeContextRestErro(t *testing.T) {
+
+	create, err := Create("tenant1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	create2, err := Create("tenant1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dbs := map[string]*gorm.DB{
+		"tenant1": create,
+		"tenant2": create2,
+	}
+
+	context := newTenantContext(dbs, "X-Tenant-ID")
+
+	router := gin.Default()
+
+	router.Use(context.ChangeContextRest())
+
+	router.GET("/test", func(c *gin.Context) {
+
+		db, exists := c.MustGet("db").(*gorm.DB)
+
+		assert.True(t, exists)
+
+		if create == db {
+
+			c.String(http.StatusOK, "OK")
+
+		}
+
+	})
+
+	req, _ := http.NewRequest(http.MethodGet, "/test", nil)
+
+	req.Header.Set("X-Tenant-ID", "tenant5")
+
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+}
+
 func Create(schema string) (*gorm.DB, error) {
 
 	db, _, err := sqlmock.New()
