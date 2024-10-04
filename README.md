@@ -10,28 +10,6 @@ Tenant Context REST é um middleware projetado para o framework Gin, com o objet
 
 ~~~ go 
 
-    type Company struct {
-        gorm.Model
-        LegalId string `json:"legal_id"`
-        Name    string `json:"name"`
-    }
-    // ... configuração de acesso ao banco de dados
-    
-    tx := db.Exec(fmt.Sprintf("CREATE SCHEMA %s", tenantA))
 
-    tx := db.Exec(fmt.Sprintf("CREATE SCHEMA %s", tenantB))
-	
-    // … execução da migração de banco de dados 
-	
-    r := gin.Default()
-    r.Use(newTenantContextRest(db, "X-Tenant-ID").ChangeContext())
-    r.GET("/", func(context *gin.Context) {
-    
-        var com Company
-        db.First(&com)
-            
-        c.JSON(http.StatusOK, com)
-        
-    })
 
 ~~~

@@ -1,44 +1,70 @@
 package tenantcontextrest
 
 import (
-	"fmt"
+	"context"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 	"log"
 )
 
-type tenantContextRest struct {
-	db  *gorm.DB
+type repo interface {
+	ChangeContextRest()
+	ChangeContextGrpc()
+}
+
+type tenantContext struct {
+	dbs map[string]*gorm.DB
 	key string
 }
 
-func newTenantContextRest(db *gorm.DB, key string) tenantContextRest {
+func newTenantContext(dbs map[string]*gorm.DB, key string) tenantContext {
 
-	return tenantContextRest{
-		db:  db,
+	return tenantContext{
+		dbs: dbs,
 		key: key,
 	}
 }
 
-func (t tenantContextRest) ChangeContext() gin.HandlerFunc {
+func (t tenantContext) ChangeContextRest() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
 		schema := c.GetHeader(t.key)
 
-		err := t.changeSchema(schema)
+		db := t.dbs[schema]
 
-		if err != nil {
-			panic("An error occurred while switching to the scheme " + schema)
-		}
+		c.Set("db", db)
+
 	}
 }
 
-func (t tenantContextRest) changeSchema(schema string) error {
+func (t tenantContext) ChangeContextGrpc() grpc.UnaryServerInterceptor {
 
-	log.Println("Trying to change schema")
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 
-	tx := t.db.Exec(fmt.Sprintf("SET search_path TO %s", schema))
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Errorf(codes.DataLoss, "Metadados ausentes")
+		}
 
-	return tx.Error
+		schemas := md.Get(t.key)
+		if len(schemas) == 0 {
+			return nil, status.Errorf(codes.Unauthenticated, "%s de autorização ausente", t.key)
+		}
+
+		schema := schemas[0]
+
+		log.Printf("Schema: %s", schema)
+
+		db := t.dbs[schema]
+
+		newCtx := context.WithValue(ctx, "db", db)
+
+		return handler(newCtx, req)
+
+	}
 }

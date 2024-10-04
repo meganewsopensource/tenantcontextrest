@@ -1,59 +1,79 @@
 package tenantcontextrest
 
 import (
-	"fmt"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"testing"
 )
 
-func TestTenantContextRest_ChangeContext(t *testing.T) {
-	var key = " X-Tenant-ID"
-	var schema = "empresaleve"
+func TestChangeContextRest(t *testing.T) {
 
-	db, mock, err := Create(schema)
+	create, err := Create("tenant1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	r := gin.Default()
-	r.Use(newTenantContextRest(db, key).ChangeContext())
-	r.GET("/", func(context *gin.Context) {
+	create2, err := Create("tenant1")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		context.JSON(200, gin.H{
-			key: context.Request.Header[key],
-		})
+	dbs := map[string]*gorm.DB{
+		"tenant1": create,
+		"tenant2": create2,
+	}
+
+	context := newTenantContext(dbs, "X-Tenant-ID")
+
+	router := gin.Default()
+
+	router.Use(context.ChangeContextRest())
+
+	router.GET("/test", func(c *gin.Context) {
+
+		db, exists := c.MustGet("db").(*gorm.DB)
+
+		assert.True(t, exists)
+
+		if create == db {
+
+			c.String(http.StatusOK, "OK")
+
+		} else {
+
+			c.String(http.StatusNotFound, "not found")
+
+		}
+
 	})
 
+	req, _ := http.NewRequest(http.MethodGet, "/test", nil)
+
+	req.Header.Set("X-Tenant-ID", "tenant1")
+
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/", nil)
-	req.Header.Add(key, schema)
 
-	r.ServeHTTP(w, req)
+	router.ServeHTTP(w, req)
 
-	fmt.Println(w.Code)
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expectations: %s", err)
-	}
+	assert.Equal(t, http.StatusOK, w.Code)
 
 }
 
-func Create(schema string) (*gorm.DB, sqlmock.Sqlmock, error) {
+func Create(schema string) (*gorm.DB, error) {
 
-	db, mock, err := sqlmock.New()
+	db, _, err := sqlmock.New()
 
 	if err != nil {
 		panic(err)
 	}
 
 	dialector := postgres.New(postgres.Config{
-		DSN:                  "sqlmock_db_0",
+		DSN:                  schema,
 		DriverName:           "postgres",
 		Conn:                 db,
 		PreferSimpleProtocol: true,
@@ -64,8 +84,5 @@ func Create(schema string) (*gorm.DB, sqlmock.Sqlmock, error) {
 		panic(err)
 	}
 
-	mock.ExpectExec(regexp.QuoteMeta(fmt.Sprintf("SET search_path TO %s", schema))).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-
-	return gormDB, mock, nil
+	return gormDB, nil
 }
